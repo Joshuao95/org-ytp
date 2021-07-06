@@ -28,7 +28,9 @@
   "Your youtube Data v3 API key."
   :type '(string))
 
-;TODO: Give the option of adding "TODO" or some other prefix?
+(defcustom org-ytp-headline-prefix nil
+  "An optional prefix before video headline, useful for TODO."
+  :type '(string))
 
 ;TODO: Add option of adding description or not
 
@@ -59,23 +61,43 @@
   )
 
 
-(defun org-ytp-get-playlist-items (playlist-id)
-  "Return playlist items array for PLAYLIST-ID."
-  ; The Youtube API returns a big JSON blob, we have to dig out what we want.
+(defun org-ytp-get-playlist-page (playlist-id page-token)
+  "Return nextPageToken and array of items of PLAYLIST-ID as identified by PAGE-TOKEN."
+ 
+  
   (let* ((buf (org-youtube-api-get base-url org-ytp-api-key `(("part" . "snippet")
 							      ("playlistId" . ,playlist-id)
-							      ("maxResults" . "50"))))
-	 (json ((save-window-excursion (switch-to-buffer buf)
-				       (json-parse-buffer))))
-	 (playlist-items (gethash "items" json)))
-	 (message (gethash "nextPageToken" json))
+							      ("maxResults" . "10")
+							      ("pageToken" . ,page-token))))
+	 (json (save-window-excursion (switch-to-buffer buf)
+				      (json-parse-buffer))))
+    
+    (cons (gethash "nextPageToken" json)
+	  (gethash "items" json))))
 
-    playlist-items))
+
+
+(defun org-ytp-get-playlist-items (playlist-id)
+  "Return playlist items array for PLAYLIST-ID."
+					; The Youtube API is paginated, so we use the nextPageToken to collect all playlist items into a big array
+
+  (setq items nil)
+  (setq page-token "")
+
+  (while page-token
+    (setq result (org-ytp-get-playlist-page playlist-id page-token))
+    ;; Append the items from the page
+    (setq items (vconcat items (cdr result)))
+    
+    (setq page-token (car result))) ; Will be nil if that was the last page
+
+    items)
 
 
 (defun org-ytp-link-from-id (video-id)
   "Create Youtube watch link from VIDEO-ID."
   (concat "https://youtube.com/watch?v=" video-id))
+
 
 (defun org-ytp-headline-from-playlist-item (pl-item)
    "Create headline from PL-ITEM as returned by YouTube Data APIv3."
@@ -85,9 +107,10 @@
 	  (id (gethash "videoId"
 		       (gethash "resourceId" snippet) ))
 	  )
-     (message 
      (org-insert-heading)
 
+     (if org-ytp-headline-prefix
+	 (insert org-ytp-headline-prefix))
 					;TODO: Optional TODO element here
      (org-insert-link nil (org-ytp-link-from-id id) title)))
 
@@ -95,10 +118,7 @@
 (defun org-ytp-insert-headlines (playlist-id)
   "Create 1 org headline per video in playlist described by PLAYLIST-ID."
   (interactive "MPlaylist ID: ")
-  ;TODO: Paginate
   (mapc 'org-ytp-headline-from-playlist-item (org-ytp-get-playlist-items playlist-id)))
 
 (provide 'org-ytp)
 ;;; org-ytp.el ends here
-
-
