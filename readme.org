@@ -1,0 +1,3 @@
+This package access the Youtube Data API in order to create headlines in org representing a Youtube playlist or channel.
+The main function to use is ~org-ytp-insert-headlines~.
+You'll have to get a Youtube Data API key see here for details: https://developers.google.com/youtube/v3/getting-started
