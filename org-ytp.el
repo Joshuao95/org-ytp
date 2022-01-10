@@ -5,7 +5,6 @@
 ;; Copyright (C) 2021 Joshua O'Connor
 
 ;; Author: Joshua O'Connor <joshua@joshuao.com>
-;; URL: https://git.joshuao.com/joshuao/org-ytp
 
 
 ;;; Commentary:
@@ -13,9 +12,7 @@
 ;; This package access the Youtube Data API in order to create headlines in org
 ;; representing a Youtube playlist or channel
 ;; The main function to use is org-ytp-insert-headlines.
-;TODO: Talk about not using set in defcustom
-					;TODO: Talk about api key
-
+;; You'll have to get a Youtube Data API key see here for details: https://developers.google.com/youtube/v3/getting-started
 ;;; Code:
 
 (require 'org)
@@ -23,6 +20,7 @@
 (defgroup org-ytp nil
   "org-ytp group"
   :group 'applications)
+
 
 (defcustom org-ytp-api-key ""
   "Your youtube Data v3 API key."
@@ -32,27 +30,24 @@
   "An optional prefix before video headline, useful for TODO."
   :type '(string))
 
-;TODO: Add option of adding description or not
+					;TODO: Add option of adding description or not
 
 
-; If you have to change this, like as not the parsing of the JSON is also wrong
+					; If you have to change this, like as not the parsing of the JSON is also wrong
 (defconst base-url "https://youtube.googleapis.com/youtube/v3/playlistItems")
 
-
-
-
 (defun org-youtube-api-get (url key args)
-      "Send ARGS to URL as a GET request authorizing with KEY."
-      (let (
-            (args-string
-             (mapconcat (lambda (arg)
-                          (concat (url-hexify-string (car arg))
-                                  "="
-                                  (url-hexify-string (cdr arg))))
-                        args
-                        "&")))
-	
-        (url-retrieve-synchronously (concat url "?key=" key "&" args-string))))
+  "Send ARGS to URL as a GET request authorizing with KEY."
+  (let (
+        (args-string
+         (mapconcat (lambda (arg)
+                      (concat (url-hexify-string (car arg))
+                              "="
+                              (url-hexify-string (cdr arg))))
+                    args
+                    "&")))
+    
+    (url-retrieve-synchronously (concat url "?key=" key "&" args-string))))
 
 
 (defun org-ytp-get-uploads-playlist-id (channel-name)
@@ -63,7 +58,7 @@
 
 (defun org-ytp-get-playlist-page (playlist-id page-token)
   "Return nextPageToken and array of items of PLAYLIST-ID as identified by PAGE-TOKEN."
- 
+  
   
   (let* ((buf (org-youtube-api-get base-url org-ytp-api-key `(("part" . "snippet")
 							      ("playlistId" . ,playlist-id)
@@ -80,9 +75,9 @@
 (defun org-ytp-get-playlist-items (playlist-id)
   "Return playlist items array for PLAYLIST-ID."
 					; The Youtube API is paginated, so we use the nextPageToken to collect all playlist items into a big array
-
-  (setq items nil)
-  (setq page-token "")
+  (let ((items nil)
+	(page-token "")
+	(result nil))
 
   (while page-token
     (setq result (org-ytp-get-playlist-page playlist-id page-token))
@@ -91,7 +86,7 @@
     
     (setq page-token (car result))) ; Will be nil if that was the last page
 
-    items)
+  items))
 
 
 (defun org-ytp-link-from-id (video-id)
@@ -100,19 +95,19 @@
 
 
 (defun org-ytp-headline-from-playlist-item (pl-item)
-   "Create headline from PL-ITEM as returned by YouTube Data APIv3."
-   (let* ((snippet (gethash "snippet" pl-item))
-	  (title (gethash "title" snippet))
-	  (description (gethash "description" snippet))
-	  (id (gethash "videoId"
-		       (gethash "resourceId" snippet) ))
-	  )
-     (org-insert-heading)
+  "Create headline from PL-ITEM as returned by YouTube Data APIv3."
+  (let* ((snippet (gethash "snippet" pl-item))
+	 (title (gethash "title" snippet))
+	 (description (gethash "description" snippet))
+	 (id (gethash "videoId"
+		      (gethash "resourceId" snippet) ))
+	 )
+    (org-insert-heading)
 
-     (if org-ytp-headline-prefix
-	 (insert org-ytp-headline-prefix))
+    (if org-ytp-headline-prefix
+	(insert org-ytp-headline-prefix))
 					;TODO: Optional TODO element here
-     (org-insert-link nil (org-ytp-link-from-id id) title)))
+    (org-insert-link nil (org-ytp-link-from-id id) title)))
 
 
 (defun org-ytp-insert-headlines (playlist-id)
